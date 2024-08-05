@@ -4,9 +4,8 @@ import (
 	"errors"
 	"github.com/Aquilabot/KreaPC-API/pkg/scraper"
 	"github.com/gofiber/fiber/v2"
-
+	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"log"
 )
 
@@ -26,9 +25,9 @@ func main() {
 
 	// Create a Fiber app
 	app := fiber.New()
-	app.Use(requestid.New())
+	app.Use(helmet.New())
 	app.Use(logger.New(logger.Config{
-		Format: "${pid} | ${time} | ${latency} | ${locals:requestid} | [${ip}]:${port} | ${status} - ${method} ${path}\n",
+		Format: "${pid} | ${time} | ${latency} | [${ip}]:${port} | ${status} - ${method} ${path}\n",
 	}))
 
 	// Endpoint for searching PC parts
@@ -42,7 +41,7 @@ func main() {
 		if err != nil {
 			var redirectError *scraper.RedirectError
 			if errors.As(err, &redirectError) {
-				// Handle redirect to single product page
+				// Handle redirect to a single product page
 				part, err := scrap.GetPart(redirectError.Error())
 				if err != nil {
 					return c.Status(500).JSON(fiber.Map{"error": "Error fetching product details"})

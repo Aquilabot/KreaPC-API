@@ -1,10 +1,9 @@
 package utils
 
 import (
+	"github.com/dlclark/regexp2"
 	"github.com/gocolly/colly/v2"
 	"strings"
-
-	"github.com/dlclark/regexp2"
 )
 
 var (

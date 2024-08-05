@@ -4,13 +4,12 @@ import (
 	"errors"
 	"github.com/Aquilabot/KreaPC-API/internal/models"
 	"github.com/Aquilabot/KreaPC-API/internal/utils"
+	"github.com/gocolly/colly/v2"
 	"github.com/gocolly/colly/v2/extensions"
 	"github.com/gofiber/fiber/v2/log"
 	"net/url"
 	"strconv"
 	"strings"
-
-	"github.com/gocolly/colly/v2"
 )
 
 var (
