@@ -2,14 +2,15 @@ package scraper
 
 import (
 	"errors"
+	"github.com/Aquilabot/KreaPC-API/internal/models"
+	"github.com/Aquilabot/KreaPC-API/internal/utils"
+	"github.com/gocolly/colly/v2/extensions"
+	"github.com/gofiber/fiber/v2/log"
 	"net/url"
-	"pc_part_picker_scrapper/internal/models"
-	"pc_part_picker_scrapper/internal/utils"
 	"strconv"
 	"strings"
 
-	"github.com/dlclark/regexp2"
-	"github.com/gocolly/colly"
+	"github.com/gocolly/colly/v2"
 )
 
 var (
@@ -28,8 +29,6 @@ var (
 		"Tax":      ".td__tax",
 		"Total":    ".td__finalPrice",
 	}
-
-	scriptImageCheck = regexp2.MustCompile(`(?<=src:\s").*(?=")`, 0)
 )
 
 type Scraper struct {
@@ -55,6 +54,17 @@ func linkURL(parts ...string) string {
 	return strings.Join(parts, "")
 }
 
+func buildPCPartPickerURL(searchTerm string, region string) string {
+	if region != "" && region != "us" {
+		region += "."
+	} else {
+		region = ""
+	}
+
+	fullURL := "https://" + region + "pcpartpicker.com/search?q=" + url.QueryEscape(searchTerm)
+	return fullURL
+}
+
 // NewScraper initializes a new instance of the Scraper type and returns it.
 // It creates a new collector, sets the async and AllowURLRevisit properties to true,
 // and initializes an empty Headers map with the "global" site.
@@ -76,16 +86,16 @@ func NewScraper() Scraper {
 // UpdateHeaders updates the headers for the given site with the provided newHeaders map.
 // It updates the headers for the "global" site as well.
 // It also sets the headers for each request made by the Collector.
-func (srap *Scraper) UpdateHeaders(site string, newHeaders map[string]string) {
-	srap.Headers[site] = newHeaders
+func (scrap *Scraper) UpdateHeaders(site string, newHeaders map[string]string) {
+	scrap.Headers[site] = newHeaders
 
 	for k, v := range newHeaders {
-		srap.Headers[site][k] = v
+		scrap.Headers[site][k] = v
 	}
 
-	srap.Collector.OnRequest(func(r *colly.Request) {
-		headers := srap.Headers["global"]
-		for k, v := range srap.Headers[r.URL.Hostname()] {
+	scrap.Collector.OnRequest(func(r *colly.Request) {
+		headers := scrap.Headers["global"]
+		for k, v := range scrap.Headers[r.URL.Hostname()] {
 			headers[k] = v
 		}
 
@@ -97,10 +107,17 @@ func (srap *Scraper) UpdateHeaders(site string, newHeaders map[string]string) {
 	})
 }
 
+func (scrap *Scraper) RandomizeUserAgent() {
+	extensions.RandomUserAgent(scrap.Collector)
+	scrap.Collector.OnRequest(func(r *colly.Request) {
+		log.Info("User-Agent:", r.Headers.Get("User-Agent"))
+	})
+}
+
 // GetPartList retrieves a list of parts from the given PCPartPicker URL.
 // It returns a pointer to models.PartList and an error.
 // If the URL is invalid, it returns an error.
-func (srap *Scraper) GetPartList(URL string) (*models.PartList, error) {
+func (scrap *Scraper) GetPartList(URL string) (*models.PartList, error) {
 	if !utils.MatchPCPPURL(URL) {
 		return nil, errors.New("invalid PCPartPicker URL")
 	}
@@ -108,7 +125,7 @@ func (srap *Scraper) GetPartList(URL string) (*models.PartList, error) {
 
 	var partList models.PartList
 
-	srap.Collector.OnHTML(".partlist__wrapper", func(elem *colly.HTMLElement) {
+	scrap.Collector.OnHTML(".partlist__wrapper", func(elem *colly.HTMLElement) {
 		parts := []models.ListPart{}
 
 		elem.ForEach(".tr__product", func(i int, prod *colly.HTMLElement) {
@@ -200,8 +217,8 @@ func (srap *Scraper) GetPartList(URL string) (*models.PartList, error) {
 			Compatibility: compNotes,
 		}
 	})
-	err := srap.Collector.Visit(URL)
-	srap.Collector.Wait()
+	err := scrap.Collector.Visit(URL)
+	scrap.Collector.Wait()
 
 	if err != nil {
 		return nil, err
@@ -213,14 +230,8 @@ func (srap *Scraper) GetPartList(URL string) (*models.PartList, error) {
 // SearchPCParts retrieves a list of parts from the given search term and region.
 // It returns a slice of models.SearchPart and an error.
 // If the region is invalid, it returns an error.
-func (srap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.SearchPart, error) {
-	if region != "" && region != "us" {
-		region += "."
-	} else {
-		region = ""
-	}
-
-	fullURL := "https://" + region + "pcpartpicker.com/search?q=" + url.QueryEscape(searchTerm)
+func (scrap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.SearchPart, error) {
+	fullURL := buildPCPartPickerURL(searchTerm, region)
 
 	if !utils.MatchPCPPURL(fullURL) {
 		return nil, errors.New("invalid region")
@@ -230,11 +241,11 @@ func (srap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.S
 
 	var reqURL string
 
-	srap.Collector.OnHTML(".pageTitle", func(h *colly.HTMLElement) {
+	scrap.Collector.OnHTML(".pageTitle", func(h *colly.HTMLElement) {
 		reqURL = h.Request.URL.String()
 	})
 
-	srap.Collector.OnHTML(".search-results__pageContent .block", func(elem *colly.HTMLElement) {
+	scrap.Collector.OnHTML(".search-results__pageContent .block", func(elem *colly.HTMLElement) {
 		elem.ForEach(".list-unstyled li", func(i int, searchResult *colly.HTMLElement) {
 			searchResultURL := linkURL("https://", elem.Request.URL.Host, searchResult.ChildAttr(".search_results--price a", "href"))
 			extractedPrice := searchResult.ChildText(".search_results--price a")
@@ -267,8 +278,8 @@ func (srap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.S
 		})
 	})
 
-	err := srap.Collector.Visit(fullURL)
-	srap.Collector.Wait()
+	err := scrap.Collector.Visit(fullURL)
+	scrap.Collector.Wait()
 
 	if err != nil {
 		return nil, err
@@ -286,33 +297,27 @@ func (srap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.S
 // GetPart retrieves information about a specific part from the given URL.
 // It returns a pointer to models.Part and an error.
 // If the URL is invalid, it returns an error.
-func (srap *Scraper) GetPart(URL string) (*models.Part, error) {
+func (scrap *Scraper) GetPart(URL string) (*models.Part, error) {
 	if !utils.MatchProductURL(URL) {
 		return nil, errors.New("invalid part URL")
 	}
 
 	var images []string
 
-	srap.Collector.OnHTML(".single_image_gallery_box", func(image *colly.HTMLElement) {
+	scrap.Collector.OnHTML(".single_image_gallery_box", func(image *colly.HTMLElement) {
 		images = append(images, linkURL("https:", image.ChildAttr("a img", "src")))
 	})
 
 	if len(images) < 1 {
-		srap.Collector.OnHTML("script", func(script *colly.HTMLElement) {
-
-			for _, match := range utils.Regexp2SearchAllText(scriptImageCheck, script.Text) {
-				if strings.HasPrefix(match, "//") {
-					match = "https:" + match
-				}
-				images = append(images, match)
-			}
+		scrap.Collector.OnHTML("script", func(script *colly.HTMLElement) {
+			images = utils.FindScriptImages(script, images)
 		})
 	}
 
 	rating := models.RatingStats{}
 	var name string
 
-	srap.Collector.OnHTML(".wrapper__pageTitle section.xs-col-11", func(ratingContainer *colly.HTMLElement) {
+	scrap.Collector.OnHTML(".wrapper__pageTitle section.xs-col-11", func(ratingContainer *colly.HTMLElement) {
 		var stars uint
 		ratingContainer.ForEach(".product--rating li", func(i int, _ *colly.HTMLElement) {
 			stars += 1
@@ -336,7 +341,7 @@ func (srap *Scraper) GetPart(URL string) (*models.Part, error) {
 
 	var vendors []models.Vendor
 
-	srap.Collector.OnHTML("#prices table tbody tr", func(vendor *colly.HTMLElement) {
+	scrap.Collector.OnHTML("#prices table tbody tr", func(vendor *colly.HTMLElement) {
 		if vendor.Attr("class") != "" {
 			return
 		}
@@ -374,7 +379,7 @@ func (srap *Scraper) GetPart(URL string) (*models.Part, error) {
 
 	var specs []models.PartSpec
 
-	srap.Collector.OnHTML(".specs", func(specsContainer *colly.HTMLElement) {
+	scrap.Collector.OnHTML(".specs", func(specsContainer *colly.HTMLElement) {
 		if len(specs) > 0 {
 			return
 		}
@@ -397,8 +402,8 @@ func (srap *Scraper) GetPart(URL string) (*models.Part, error) {
 
 	})
 
-	err := srap.Collector.Visit(URL)
-	srap.Collector.Wait()
+	err := scrap.Collector.Visit(URL)
+	scrap.Collector.Wait()
 
 	if err != nil {
 		return nil, err

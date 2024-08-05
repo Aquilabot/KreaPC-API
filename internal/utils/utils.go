@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"github.com/gocolly/colly/v2"
 	"strings"
 
 	"github.com/dlclark/regexp2"
@@ -12,6 +13,7 @@ var (
 	partListURLMatcher      = regexp2.MustCompile(`^(https?://)?([a-z]{2}\.)?pcpartpicker\.com/((list/[a-zA-Z0-9]{4,8})|((user/\w*/saved/(#view=)?[a-zA-Z0-9]{4,8})))`, 0)
 	vendorNameMatcher       = regexp2.MustCompile(`(?<=pcpartpicker\.com/mr/).*(?=\/)`, 0)
 	pcppUserSavedURLMatcher = regexp2.MustCompile(`^(https?://)?([a-z]{2}\.)?pcpartpicker\.com/user/[a-zA-Z0-9]*/saved/#view=[a-zA-Z0-9]{4,8}`, 0)
+	scriptImageCheck        = regexp2.MustCompile(`(?<=src:\s").*(?=")`, 0)
 )
 
 func ExtractVendorName(URL string) string {
@@ -55,6 +57,16 @@ func MatchPartListURL(URL string) bool {
 
 func ExtractPartListURLs(text string) []string {
 	return Regexp2SearchAllText(partListURLMatcher, text)
+}
+
+func FindScriptImages(script *colly.HTMLElement, images []string) []string {
+	for _, match := range Regexp2SearchAllText(scriptImageCheck, script.Text) {
+		if strings.HasPrefix(match, "//") {
+			match = "https:" + match
+		}
+		images = append(images, match)
+	}
+	return images
 }
 
 func Regexp2SearchAllText(re *regexp2.Regexp, s string) []string {
