@@ -106,6 +106,9 @@ func (scrap *Scraper) UpdateHeaders(site string, newHeaders map[string]string) {
 	})
 }
 
+// RandomizeUserAgent is a method of the Scraper struct.
+// It sets a random User-Agent in the Collector headers
+// and logs the chosen User-Agent for every request made by the collector.
 func (scrap *Scraper) RandomizeUserAgent() {
 	extensions.RandomUserAgent(scrap.Collector)
 	scrap.Collector.OnRequest(func(r *colly.Request) {
@@ -246,7 +249,7 @@ func (scrap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.
 
 	scrap.Collector.OnHTML(".search-results__pageContent .block", func(elem *colly.HTMLElement) {
 		elem.ForEach(".list-unstyled li", func(i int, searchResult *colly.HTMLElement) {
-			searchResultURL := linkURL("https://", elem.Request.URL.Host, searchResult.ChildAttr(".search_results--price a", "href"))
+			partVendorURL := linkURL("https://", elem.Request.URL.Host, searchResult.ChildAttr(".search_results--price a", "href"))
 			extractedPrice := searchResult.ChildText(".search_results--price a")
 
 			price, curr, _ := models.ParsePrice(extractedPrice)
@@ -254,11 +257,11 @@ func (scrap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.
 			extractedVendorName := ""
 
 			if extractedPrice != "" {
-				extractedVendorName = utils.ExtractVendorName(searchResultURL)
+				extractedVendorName = utils.ExtractVendorName(partVendorURL)
 			}
 
 			partVendor := models.Vendor{
-				URL:  searchResultURL,
+				URL:  partVendorURL,
 				Name: extractedVendorName,
 				Price: models.Price{
 					Total:       price,
@@ -401,6 +404,12 @@ func (scrap *Scraper) GetPart(URL string) (*models.Part, error) {
 
 	})
 
+	var productType string
+
+	scrap.Collector.OnHTML("section.breadcrumb ol.list-unstyled", func(breadcrumb *colly.HTMLElement) {
+		productType = breadcrumb.ChildText("li a")
+	})
+
 	err := scrap.Collector.Visit(URL)
 	scrap.Collector.Wait()
 
@@ -409,10 +418,12 @@ func (scrap *Scraper) GetPart(URL string) (*models.Part, error) {
 	}
 
 	return &models.Part{
+		Type:    productType,
 		Name:    name,
 		Rating:  rating,
 		Specs:   specs,
 		Vendors: vendors,
 		Images:  images,
+		URL:     URL,
 	}, nil
 }

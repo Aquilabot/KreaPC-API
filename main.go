@@ -68,6 +68,20 @@ func main() {
 		return c.JSON(part)
 	})
 
+	// Endpoint for getting details of a list of parts
+	app.Post("/getPartList", func(c *fiber.Ctx) error {
+		var req GetPartRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request payload"})
+		}
+
+		part, err := scrap.GetPartList(req.URL)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Error fetching part"})
+		}
+		return c.JSON(part)
+	})
+
 	// Start the server
 	log.Fatal(app.Listen(":3000"))
 }
