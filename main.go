@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/Aquilabot/KreaPC-API/pkg/pcpartpicker_automation"
 	"github.com/Aquilabot/KreaPC-API/pkg/scraper"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -14,8 +15,13 @@ type SearchRequest struct {
 	Region string `json:"region"`
 }
 
-type GetPartRequest struct {
+type URLRequest struct {
 	URL string `json:"url"`
+}
+
+type URLsRequest struct {
+	Region string   `json:"region"`
+	URLs   []string `json:"urls"`
 }
 
 func main() {
@@ -56,7 +62,7 @@ func main() {
 
 	// Endpoint for getting details of a single part
 	app.Post("/getPart", func(c *fiber.Ctx) error {
-		var req GetPartRequest
+		var req URLRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid request payload"})
 		}
@@ -70,12 +76,26 @@ func main() {
 
 	// Endpoint for getting details of a list of parts
 	app.Post("/getPartList", func(c *fiber.Ctx) error {
-		var req GetPartRequest
+		var req URLRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "Invalid request payload"})
 		}
 
 		part, err := scrap.GetPartList(req.URL)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Error fetching part"})
+		}
+		return c.JSON(part)
+	})
+
+	// Endpoint for getting details of a list of parts
+	app.Post("/generatePCPPList", func(c *fiber.Ctx) error {
+		var req URLsRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request payload"})
+		}
+		list, err := pcpartpicker_automation.ProcessPartLinks(req.Region, req.URLs)
+		part, err := scrap.GetPartList(list.URL)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Error fetching part"})
 		}

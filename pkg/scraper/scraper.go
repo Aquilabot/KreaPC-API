@@ -53,14 +53,14 @@ func linkURL(parts ...string) string {
 	return strings.Join(parts, "")
 }
 
-func buildPCPartPickerURL(searchTerm string, region string) string {
+func buildSearchURL(searchTerm string, region string) string {
 	if region != "" && region != "us" {
 		region += "."
 	} else {
 		region = ""
 	}
 
-	fullURL := "https://" + region + "pcpartpicker.com/search?q=" + url.QueryEscape(searchTerm)
+	fullURL := utils.BuildPrefixURL(region) + "search?q=" + url.QueryEscape(searchTerm)
 	return fullURL
 }
 
@@ -233,7 +233,7 @@ func (scrap *Scraper) GetPartList(URL string) (*models.PartList, error) {
 // It returns a slice of models.SearchPart and an error.
 // If the region is invalid, it returns an error.
 func (scrap *Scraper) SearchPCParts(searchTerm string, region string) ([]models.SearchPart, error) {
-	fullURL := buildPCPartPickerURL(searchTerm, region)
+	fullURL := buildSearchURL(searchTerm, region)
 
 	if !utils.MatchPCPPURL(fullURL) {
 		return nil, errors.New("invalid region")

@@ -77,3 +77,13 @@ func Regexp2SearchAllText(re *regexp2.Regexp, s string) []string {
 	}
 	return matches
 }
+
+func BuildPrefixURL(region string) string {
+	if region != "" && region != "us" {
+		region += "."
+	} else {
+		region = ""
+	}
+	prefixURL := "https://" + region + "pcpartpicker.com/"
+	return prefixURL
+}
