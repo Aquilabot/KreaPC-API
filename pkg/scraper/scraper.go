@@ -54,12 +54,6 @@ func linkURL(parts ...string) string {
 }
 
 func buildSearchURL(searchTerm string, region string) string {
-	if region != "" && region != "us" {
-		region += "."
-	} else {
-		region = ""
-	}
-
 	fullURL := utils.BuildPrefixURL(region) + "search?q=" + url.QueryEscape(searchTerm)
 	return fullURL
 }
